@@ -15,7 +15,9 @@ The full process and findings are documented in the jupyter notebook uk-data-sci
 In short the analysis found that a large proportion of data science jobs are found in London and that they are very often permanent positions. The key skill request is Python appearing in 84% of jobs. R and SQL feature highly also.
 
 ## Acknowledgements
+
 Help with coding a Donut chart - https://medium.com/@krishnakummar/donut-chart-with-python-matplotlib-d411033c960b
+
 Data scraped from - http://Indeed.co.uk
 
 ## Requirements
