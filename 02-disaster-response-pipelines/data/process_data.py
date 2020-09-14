@@ -1,8 +1,23 @@
 import sys
+import pandas as pd
 
 
 def load_data(messages_filepath, categories_filepath):
-    pass
+    """
+    Loads message and category data from csv files paths and return a pandas data frame of the the two datasets joined on id
+
+    Args:
+        messages_filepath
+            fil path to messages csv file
+        categories_filepath
+            file path to categories csv fil
+    Returns:
+        pandas data frame
+    """
+    messages   = pd.read_csv(messages_filepath)
+    categories = pd.read_csv(categories_filepath)
+    df = messages.merge(categories, on='id')
+    return df 
 
 
 def clean_data(df):
