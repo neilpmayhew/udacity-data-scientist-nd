@@ -1,25 +1,154 @@
 import sys
+# import libraries
+import nltk
+nltk.download(['punkt', 'wordnet', 'averaged_perceptron_tagger'])
+
+import re
+import numpy as np
+import pandas as pd
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+from sqlalchemy import create_engine
+from sklearn.metrics import confusion_matrix
+from sklearn.ensemble import RandomForestClassifier,GradientBoostingClassifier
+from sklearn.model_selection import train_test_split,GridSearchCV
+from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.metrics import classification_report,f1_score
+from sklearn.multioutput import MultiOutputClassifier
+import pickle
+from xgboost import XGBClassifier
 
 
 def load_data(database_filepath):
-    pass
+    engine = create_engine(f'sqlite:///{database_filepath}')
 
+    df = pd.read_sql('SELECT * FROM message_category',engine)
+    X = df.message
+    y = df.iloc[:,4:]
+
+    return X,y,y.columns 
+
+url_regex = 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
 
 def tokenize(text):
-    pass
+    """
+    tokenize text by:
+    1. Replace any urls with urlplaceholder
+    2. Split into tokens (words)
+    3. lemmatize
+    
+    Args:
+        text:
+            the text to tokenize.
+    """
+    detected_urls = re.findall(url_regex, text)
+    for url in detected_urls:
+        text = text.replace(url, "urlplaceholder")
 
+    tokens = word_tokenize(text)
+    lemmatizer = WordNetLemmatizer()
+
+    clean_tokens = []
+    for tok in tokens:
+        clean_tok = lemmatizer.lemmatize(tok).lower().strip()
+        clean_tokens.append(clean_tok)
+
+    return clean_tokens
+
+class StartingVerbExtractor(BaseEstimator, TransformerMixin):
+
+    def starting_verb(self, text):
+        sentence_list = nltk.sent_tokenize(text)
+        for sentence in sentence_list:
+            pos_tags = nltk.pos_tag(tokenize(sentence))
+            first_word, first_tag = pos_tags[0]
+            if first_tag in ['VB', 'VBP'] or first_word == 'RT':
+                return True
+        return False
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        X_tagged = pd.Series(X).apply(self.starting_verb)
+        return pd.DataFrame(X_tagged)
 
 def build_model():
-    pass
+    """
+    Build an ML pipeline with tfidf and starting verb features.
+
+    An XGBoost classifier is used wrapped in MultiOutputClassier to enable multiple outputs
+
+    A grid search is constructed to
 
 
-def evaluate_model(model, X_test, Y_test, category_names):
-    pass
+    """
+    xgboost_with_starting_verb = Pipeline([
+            ('features', FeatureUnion([
 
+                ('text_pipeline', Pipeline([
+                    ('vect', CountVectorizer(tokenizer=tokenize)),
+                    ('tfidf', TfidfTransformer())
+                ])),
+
+                ('starting_verb', StartingVerbExtractor())
+            ])),
+
+            ('clf', MultiOutputClassifier(XGBClassifier(objective='binary:logistic')))
+        ])
+
+    param_grid = param_test1 = {'clf__estimator__max_depth':range(3,10,2)
+                                , 'clf__estimator__min_child_weight':range(1,6,2)}
+
+
+    gsearch_xgboost_with_starting_verb = GridSearchCV(estimator = xgboost_with_starting_verb,
+                            param_grid = param_grid,
+                            n_jobs=3, iid=False, 
+                            cv=3)
+
+    return gsearch_xgboost_with_starting_verb
+
+def evaluate_model(model, X_test, y_test, category_names):
+    """
+    Calculate and print overall accuracy and f1 scores followed by a classification report showing metric for each category
+    """
+    y_pred = model.predict(X_test)
+    
+    accuracy = (y_test == y_pred).mean().mean()
+    f1_samples = f1_score(y_test, y_pred, average='samples')
+    f1_weighted = f1_score(y_test, y_pred, average='weighted')
+    
+    print(f'''
+    Overall accuracy      : {accuracy}
+    Overall f1 [samples]  : {f1_samples}
+    Overall f1 [weighted] : {f1_weighted}
+    ''')
+        
+    labels = [1,0]
+    n=0
+
+    for category_name in category_names:
+
+        print(classification_report(y_test.iloc[:,n],y_pred[:,n],labels=labels,target_names=[category_name + '-' + str(v) for v in labels]))
+
+        n+=1
 
 def save_model(model, model_filepath):
-    pass
+    """
+    Save the model to a pickle file
 
+    args:
+
+    model:
+    the model to save
+
+    model_filepath:
+    filepath to write the pickle file to
+
+    """
+    pickle.dump(model, open(model_filepath, 'wb'))
 
 def main():
     if len(sys.argv) == 3:
