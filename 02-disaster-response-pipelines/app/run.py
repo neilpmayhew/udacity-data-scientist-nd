@@ -1,36 +1,26 @@
+import sys
+sys.path.append("..")
+
+from disaster_message_components.disaster_message_tokenize import tokenize
+from disaster_message_components.starting_verb_extractor import StartingVerbExtractor
 import json
 import plotly
 import pandas as pd
-
-from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize
-
 from flask import Flask
 from flask import render_template, request, jsonify
-from plotly.graph_objs import Bar
-from sklearn.externals import joblib
+from plotly.graph_objs import Bar,Heatmap
+from joblib import load
 from sqlalchemy import create_engine
-
 
 app = Flask(__name__)
 
-def tokenize(text):
-    tokens = word_tokenize(text)
-    lemmatizer = WordNetLemmatizer()
-
-    clean_tokens = []
-    for tok in tokens:
-        clean_tok = lemmatizer.lemmatize(tok).lower().strip()
-        clean_tokens.append(clean_tok)
-
-    return clean_tokens
 
 # load data
-engine = create_engine('sqlite:///../data/YourDatabaseName.db')
-df = pd.read_sql_table('YourTableName', engine)
+engine = create_engine('sqlite:///../data/disaster_messages.db')
+df = pd.read_sql_table('message_category', engine)
 
 # load model
-model = joblib.load("../models/your_model_name.pkl")
+model = load("../models/disaster_response_classifier.pkl")
 
 
 # index webpage displays cool visuals and receives user input text for model
@@ -42,7 +32,8 @@ def index():
     # TODO: Below is an example - modify to extract data for your own visuals
     genre_counts = df.groupby('genre').count()['message']
     genre_names = list(genre_counts.index)
-    
+
+    category_counts_by_genre = df.groupby('genre').sum().iloc[:,1:]
     # create visuals
     # TODO: Below is an example - modify to create your own visuals
     graphs = [
@@ -58,6 +49,25 @@ def index():
                 'title': 'Distribution of Message Genres',
                 'yaxis': {
                     'title': "Count"
+                },
+                'xaxis': {
+                    'title': "Genre"
+                }
+            }
+        }
+        ,{
+            'data': [
+                Heatmap(
+                    y=list(category_counts_by_genre.index),
+                    x=category_counts_by_genre.columns,
+                    z=category_counts_by_genre
+                )
+            ],
+
+            'layout': {
+                'title': 'Heatmap of Category Count by Message Genre',
+                'yaxis': {
+                    'title': "Category"
                 },
                 'xaxis': {
                     'title': "Genre"

@@ -1,25 +1,25 @@
 import sys
-# import libraries
+sys.path.append("..")
+
+
 import nltk
 nltk.download(['punkt', 'wordnet', 'averaged_perceptron_tagger'])
 
 import re
 import numpy as np
 import pandas as pd
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
 from sqlalchemy import create_engine
 from sklearn.metrics import confusion_matrix
 from sklearn.ensemble import RandomForestClassifier,GradientBoostingClassifier
 from sklearn.model_selection import train_test_split,GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.metrics import classification_report,f1_score
 from sklearn.multioutput import MultiOutputClassifier
 import pickle
 from xgboost import XGBClassifier
-
+from disaster_message_components.disaster_message_tokenize import tokenize
+from disaster_message_components.starting_verb_extractor import StartingVerbExtractor
 
 def load_data(database_filepath):
     engine = create_engine(f'sqlite:///{database_filepath}')
@@ -29,51 +29,6 @@ def load_data(database_filepath):
     y = df.iloc[:,4:]
 
     return X,y,y.columns 
-
-url_regex = 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
-
-def tokenize(text):
-    """
-    tokenize text by:
-    1. Replace any urls with urlplaceholder
-    2. Split into tokens (words)
-    3. lemmatize
-    
-    Args:
-        text:
-            the text to tokenize.
-    """
-    detected_urls = re.findall(url_regex, text)
-    for url in detected_urls:
-        text = text.replace(url, "urlplaceholder")
-
-    tokens = word_tokenize(text)
-    lemmatizer = WordNetLemmatizer()
-
-    clean_tokens = []
-    for tok in tokens:
-        clean_tok = lemmatizer.lemmatize(tok).lower().strip()
-        clean_tokens.append(clean_tok)
-
-    return clean_tokens
-
-class StartingVerbExtractor(BaseEstimator, TransformerMixin):
-
-    def starting_verb(self, text):
-        sentence_list = nltk.sent_tokenize(text)
-        for sentence in sentence_list:
-            pos_tags = nltk.pos_tag(tokenize(sentence))
-            first_word, first_tag = pos_tags[0]
-            if first_tag in ['VB', 'VBP'] or first_word == 'RT':
-                return True
-        return False
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        X_tagged = pd.Series(X).apply(self.starting_verb)
-        return pd.DataFrame(X_tagged)
 
 def build_model():
     """
