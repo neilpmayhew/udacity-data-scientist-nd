@@ -22,6 +22,9 @@ from disaster_message_components.disaster_message_tokenize import tokenize
 from disaster_message_components.starting_verb_extractor import StartingVerbExtractor
 
 def load_data(database_filepath):
+    """
+    Load the training/test data set from the sql lite database at database_filepath
+    """
     engine = create_engine(f'sqlite:///{database_filepath}')
 
     df = pd.read_sql('SELECT * FROM message_category',engine)
