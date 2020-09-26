@@ -60,7 +60,15 @@ def clean_data(df):
 
     return df
 def save_data(df, database_filename):
+    """
+    Saves the data frame to a SQL Lite database file
 
+    args:
+      df:
+        The pandas data frame to save
+      database_filename:
+        filename to save the SQLLite db to
+    """
     engine = create_engine(f'sqlite:///{database_filename}')
     df.to_sql('message_category', engine, index=False)
     
